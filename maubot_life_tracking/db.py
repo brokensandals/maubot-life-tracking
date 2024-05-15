@@ -30,6 +30,28 @@ async def upgrade_v1(conn: Connection) -> None:
           FOREIGN KEY (room_id) REFERENCES rooms(id)
         )"""
     )
+    await conn.execute(
+        """CREATE TABLE outreaches (
+            room_id TEXT NOT NULL,
+            event_id TEXT NOT NULL,
+            prompt_name TEXT NOT NULL,
+            timestamp_utc TEXT NOT NULL,
+            message TEXT NOT NULL,
+            PRIMARY KEY (room_id, event_id),
+            FOREIGN KEY (room_id) REFERENCES rooms(id)
+        )"""
+    )
+    await conn.execute(
+        """CREATE TABLE responses (
+            room_id TEXT NOT NULL,
+            event_id TEXT NOT NULL,
+            outreach_event_id TEXT NOT NULL,
+            timestamp_utc TEXT NOT NULL,
+            message TEXT NOT NULL,
+            PRIMARY KEY (room_id, event_id),
+            FOREIGN KEY (room_id, outreach_event_id) REFERENCES outreaches(room_id, event_id)
+        )"""
+    )
 
 
 class Room:
@@ -46,6 +68,24 @@ class Prompt:
         self.next_run = next_run
         self.run_interval = run_interval
         self.max_random_delay = max_random_delay
+
+
+class Outreach:
+    def __init__(self, room_id: str, event_id: str, prompt_name: str, timestamp: datetime, message: str) -> None:
+        self.room_id = room_id
+        self.event_id = event_id
+        self.prompt_name = prompt_name
+        self.timestamp = timestamp
+        self.message = message
+
+
+class Response:
+    def __init__(self, room_id: str, event_id: str, outreach_event_id: str, timestamp: datetime, message: str) -> None:
+        self.room_id = room_id
+        self.event_id = event_id
+        self.outreach_event_id = outreach_event_id
+        self.timestamp = timestamp
+        self.message = message
 
 
 async def fetch_room(db: Database, room_id: str) -> Optional[Room]:
@@ -98,7 +138,7 @@ async def upsert_prompt(db: Database, prompt: Prompt) -> None:
     """
     next_run_utc = None
     if prompt.next_run:
-        next_run_utc = prompt.next_run.strftime(DB_DATETIME_FMT)
+        next_run_utc = prompt.next_run.astimezone(timezone.utc).strftime(DB_DATETIME_FMT)
     run_interval_sec = None
     if prompt.run_interval:
         run_interval_sec = prompt.run_interval.total_seconds()
@@ -111,3 +151,13 @@ async def upsert_prompt(db: Database, prompt: Prompt) -> None:
 async def delete_prompt(db: Database, room_id: str, name: str) -> None:
     q = "DELETE FROM prompts WHERE room_id=$1 AND name=$2"
     await db.execute(q, room_id, name)
+
+
+async def insert_outreach(db: Database, outreach: Outreach) -> None:
+    q = "INSERT INTO outreaches(room_id, event_id, prompt_name, timestamp_utc, message) VALUES ($1, $2, $3, $4, $5)"
+    await db.execute(q, outreach.room_id, outreach.event_id, outreach.prompt_name, outreach.timestamp.astimezone(timezone.utc).strftime(DB_DATETIME_FMT), outreach.message)
+
+
+async def insert_response(db: Database, response: Response) -> None:
+    q = "INSERT INTO responses(room_id, event_id, outreach_event_id, timestamp_utc, message) VALUES ($1, $2, $3, $4, $5)"
+    await db.execute(q, response.room_id, response.event_id, response.outreach_event_id, response.timestamp.astimezone(timezone.utc).strftime(DB_DATETIME_FMT), response.message)
