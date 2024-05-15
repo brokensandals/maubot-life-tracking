@@ -3,6 +3,8 @@ from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 from maubot import Plugin, MessageEvent
 from maubot.handlers import event
 from mautrix.types import EventType, MessageEvent
+from maubot_life_tracking import db
+from mautrix.util.async_db import UpgradeTable
 
 
 class Config(BaseProxyConfig):
@@ -30,4 +32,8 @@ class LifeTrackingBot(Plugin):
             self.log.warn(f"stranger danger: sender={evt.sender}")
             return
         pass
+
+    @classmethod
+    def get_db_upgrade_table(cls) -> UpgradeTable | None:
+        return db.upgrade_table
 
