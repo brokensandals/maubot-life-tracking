@@ -8,6 +8,7 @@ from mautrix.types import EventType, MessageEvent
 class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
         helper.copy("allowlist")
+        helper.copy("default_tz")
 
 
 class LifeTrackingBot(Plugin):
