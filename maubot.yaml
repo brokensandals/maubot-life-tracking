@@ -1,0 +1,10 @@
+maubot: 0.1.0
+id: net.brokensandals.life_tracking
+version: 1.0.0
+license: MIT
+modules:
+  - maubot_life_tracking
+main_class: LifeTrackingBot
+config: true
+extra_files:
+  - base-config.yaml

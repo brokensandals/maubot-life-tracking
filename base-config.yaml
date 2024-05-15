@@ -1,0 +1,2 @@
+# Set allowlist to `false` to allow anyone; otherwise add entries such as "@user:example.com"
+allowlist: []
