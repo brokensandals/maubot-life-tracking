@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from mautrix.util.async_db import Database
-from maubot_life_tracking.db import upgrade_table, fetch_room, upsert_room, Room, Prompt, fetch_prompt, upsert_prompt, delete_prompt, Outreach, insert_outreach, Response, insert_response
+from maubot_life_tracking.db import upgrade_table, fetch_room, upsert_room, Room, Prompt, fetch_prompt, upsert_prompt, delete_prompt, Outreach, insert_outreach, Response, insert_response, fetch_outreaches_and_responses
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta, timezone
 
@@ -59,10 +59,32 @@ class TestDb(unittest.IsolatedAsyncioTestCase):
             outreach = Outreach("a", "o1", "foo", now, "What's up?")
             await insert_outreach(db, outreach)
 
-            response1 = Response("a", "r1", "o1", now, "✅")
+            outreach2 = Outreach("a", "o2", "bar", now+timedelta(seconds=-1), "???")
+            await insert_outreach(db, outreach2)
+
+            response1 = Response("a", "r1", "o1", now+timedelta(seconds=2), "✅")
             await insert_response(db, response1)
-            response2 = Response("a", "r2", "o1", now, "oops actually no")
+            response2 = Response("a", "r2", "o1", now+timedelta(seconds=3), "oops actually no")
             await insert_response(db, response2)
+
+            ors = await fetch_outreaches_and_responses(db, "a")
+            self.assertEqual(len(ors), 2)
+            outreach2, outreach2_responses = ors[0]
+            self.assertEqual(outreach2.event_id, "o2")
+            self.assertEqual(outreach2.prompt_name, "bar")
+            self.assertEqual(outreach2.message, "???")
+            self.assertEqual(outreach2_responses, [])
+            outreach, outreach_responses = ors[1]
+            self.assertEqual(outreach.event_id, "o1")
+            self.assertEqual(outreach.prompt_name, "foo")
+            self.assertEqual(outreach.message, "What's up?")
+            self.assertEqual(len(outreach_responses), 2)
+            response1 = outreach_responses[0]
+            self.assertEqual(response1.event_id, "r1")
+            self.assertEqual(response1.message, "✅")
+            response2 = outreach_responses[1]
+            self.assertEqual(response2.event_id, "r2")
+            self.assertEqual(response2.message, "oops actually no")
 
             await delete_prompt(db, "a", "foo")
             self.assertEqual(None, await fetch_prompt(db, "a", "foo"))

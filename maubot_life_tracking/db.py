@@ -1,5 +1,5 @@
 from mautrix.util.async_db import UpgradeTable, Connection, Database
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta, timezone
 
@@ -161,3 +161,27 @@ async def insert_outreach(db: Database, outreach: Outreach) -> None:
 async def insert_response(db: Database, response: Response) -> None:
     q = "INSERT INTO responses(room_id, event_id, outreach_event_id, timestamp_utc, message) VALUES ($1, $2, $3, $4, $5)"
     await db.execute(q, response.room_id, response.event_id, response.outreach_event_id, response.timestamp.astimezone(timezone.utc).strftime(DB_DATETIME_FMT), response.message)
+
+
+async def fetch_outreaches_and_responses(db: Database, room_id: str) -> List[Tuple[Outreach, List[Response]]]:
+    q = """
+        SELECT outreaches.event_id AS oid, outreaches.prompt_name, outreaches.timestamp_utc AS ots, outreaches.message AS om, responses.event_id AS rid, responses.timestamp_utc AS rtc, responses.message AS rm
+        FROM outreaches LEFT JOIN responses ON outreaches.room_id = responses.room_id AND outreaches.event_id = responses.outreach_event_id
+        WHERE outreaches.room_id = $1
+        ORDER BY DATETIME(outreaches.timestamp_utc), DATETIME(responses.timestamp_utc)
+    """
+    rows = await db.fetch(q, room_id)
+    outreaches_by_id = {}
+    outreach_responses = {}
+    for row in rows:
+        outreach_event_id = row["oid"]
+        if outreach_event_id in outreaches_by_id:
+            outreach = outreaches_by_id[outreach_event_id]
+        else:
+            outreach = Outreach(room_id, outreach_event_id, row["prompt_name"], datetime.strptime(row["ots"], DB_DATETIME_FMT).replace(tzinfo=timezone.utc), row["om"])
+            outreaches_by_id[outreach_event_id] = outreach
+            outreach_responses[outreach_event_id] = []
+        if row["rid"]:
+            response = Response(room_id, row["rid"], outreach_event_id, datetime.strptime(row["rtc"], DB_DATETIME_FMT).replace(tzinfo=timezone.utc), row["rm"])
+            outreach_responses[outreach_event_id].append(response)
+    return [(o, outreach_responses[o.event_id]) for o in outreaches_by_id.values()]
