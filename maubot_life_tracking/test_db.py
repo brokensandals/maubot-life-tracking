@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from mautrix.util.async_db import Database
-from maubot_life_tracking.db import upgrade_table, fetch_room, upsert_room, Room, Prompt, fetch_prompt, upsert_prompt, delete_prompt, Outreach, insert_outreach, Response, insert_response, fetch_outreaches_and_responses
+from maubot_life_tracking.db import upgrade_table, fetch_room, upsert_room, Room, Prompt, fetch_prompt, upsert_prompt, delete_prompt, Outreach, insert_outreach, Response, insert_response, fetch_outreaches_and_responses, fetch_prompts
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta, timezone
 
@@ -55,6 +55,15 @@ class TestDb(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(prompt.next_run, now)
             self.assertEqual(prompt.run_interval, timedelta(days=1))
             self.assertEqual(prompt.max_random_delay, timedelta(hours=16))
+
+            prompts = await fetch_prompts(db, "a")
+            self.assertEqual(len(prompts), 1)
+            self.assertEqual(prompts[0].room_id, "a")
+            self.assertEqual(prompts[0].name, "foo")
+            self.assertEqual(prompts[0].message_template, "Test Message")
+            self.assertEqual(prompts[0].next_run, now)
+            self.assertEqual(prompts[0].run_interval, timedelta(days=1))
+            self.assertEqual(prompts[0].max_random_delay, timedelta(hours=16))
 
             outreach = Outreach("a", "o1", "foo", now, "What's up?")
             await insert_outreach(db, outreach)

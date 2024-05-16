@@ -131,6 +131,22 @@ async def fetch_prompt(db: Database, room_id: str, name: str) -> Optional[Prompt
     return prompt
 
 
+async def fetch_prompts(db: Database, room_id: str) -> List[Prompt]:
+    q = "SELECT name, message_template, next_run_utc, run_interval_sec, max_random_delay_sec FROM prompts WHERE room_id=$1"
+    rows = await db.fetch(q, room_id)
+    results = []
+    for row in rows:
+        prompt = Prompt(room_id, row["name"], row["message_template"])
+        if row["next_run_utc"]:
+            prompt.next_run = datetime.strptime(row["next_run_utc"], DB_DATETIME_FMT).replace(tzinfo=timezone.utc)
+        if row["run_interval_sec"]:
+            prompt.run_interval = timedelta(seconds=row["run_interval_sec"])
+        if row["max_random_delay_sec"]:
+            prompt.max_random_delay = timedelta(seconds=row["max_random_delay_sec"])
+        results.append(prompt)
+    return results
+
+
 async def upsert_prompt(db: Database, prompt: Prompt) -> None:
     q = """
         INSERT INTO prompts(room_id, name, message_template, next_run_utc, run_interval_sec, max_random_delay_sec) VALUES ($1, $2, $3, $4, $5, $6)
