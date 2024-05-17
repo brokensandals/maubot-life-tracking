@@ -189,6 +189,14 @@ async def insert_outreach(db: Database, outreach: Outreach) -> None:
     await db.execute(q, outreach.room_id, outreach.event_id, outreach.prompt_name, outreach.timestamp.astimezone(timezone.utc).strftime(DB_DATETIME_FMT), outreach.message)
 
 
+async def fetch_outreach(db: Database, room_id: str, event_id: str) -> Optional[Outreach]:
+    q = "SELECT prompt_name, timestamp_utc, message FROM outreaches WHERE room_id=$1 AND event_id=$2"
+    row = await db.fetchrow(q, room_id, event_id)
+    if not row:
+        return None
+    return Outreach(room_id, event_id, row["prompt_name"], datetime.strptime(row["timestamp_utc"], DB_DATETIME_FMT).replace(tzinfo=timezone.utc), row["message"])
+
+
 async def insert_response(db: Database, response: Response) -> None:
     q = "INSERT INTO responses(room_id, event_id, outreach_event_id, timestamp_utc, message) VALUES ($1, $2, $3, $4, $5)"
     await db.execute(q, response.room_id, response.event_id, response.outreach_event_id, response.timestamp.astimezone(timezone.utc).strftime(DB_DATETIME_FMT), response.message)

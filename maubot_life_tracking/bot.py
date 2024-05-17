@@ -220,7 +220,14 @@ class LifeTrackingBot(Plugin):
         if not self.is_allowed(evt.sender):
             self.log.warn(f"stranger danger: sender={evt.sender}")
             return
-        pass
+        room = await self.get_room(evt.room_id)
+        if evt.relates_to:
+            outreach = await db.fetch_outreach(self.database, room.room_id, evt.relates_to.event_id)
+            if outreach:
+                ts = datetime.fromtimestamp(evt.origin_server_ts / 1000, timezone.utc)
+                response = db.Response(room.room_id, evt.event_id, outreach.event_id, ts, evt.content.body)
+                await db.insert_response(self.database, response)
+        await evt.mark_read()
 
     @classmethod
     def get_db_upgrade_table(cls) -> UpgradeTable | None:
