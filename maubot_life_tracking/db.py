@@ -131,12 +131,27 @@ async def fetch_prompt(db: Database, room_id: str, name: str) -> Optional[Prompt
     return prompt
 
 
-async def fetch_prompts(db: Database, room_id: str) -> List[Prompt]:
-    q = "SELECT name, message_template, next_run_utc, run_interval_sec, max_random_delay_sec FROM prompts WHERE room_id=$1"
-    rows = await db.fetch(q, room_id)
+async def fetch_prompts(db: Database, room_id: Optional[str] = None, due: Optional[datetime] = None) -> List[Prompt]:
+    q = "SELECT room_id, name, message_template, next_run_utc, run_interval_sec, max_random_delay_sec FROM prompts WHERE "
+    
+    argnum = 1
+    args = []
+    if due is not None:
+        args.append(due.strftime(DB_DATETIME_FMT))
+        q += f"next_run_utc IS NOT NULL AND DATETIME(next_run_utc) >= DATETIME(${argnum}) AND "
+        argnum += 1
+    if room_id is not None:
+        args.append(room_id)
+        q += f"room_id = ${argnum} AND "
+        argnum += 1
+
+    q = q.removesuffix(" WHERE ").removesuffix(" AND ")
+
+    rows = await db.fetch(q, *args)
+
     results = []
     for row in rows:
-        prompt = Prompt(room_id, row["name"], row["message_template"])
+        prompt = Prompt(row["room_id"], row["name"], row["message_template"])
         if row["next_run_utc"]:
             prompt.next_run = datetime.strptime(row["next_run_utc"], DB_DATETIME_FMT).replace(tzinfo=timezone.utc)
         if row["run_interval_sec"]:

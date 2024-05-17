@@ -1,3 +1,8 @@
 # Set allowlist to `false` to allow anyone; otherwise add entries such as "@user:example.com"
 allowlist: []
+# The timezone is currently only used to convert times provided by the user to UTC.
+# Can be overridden per-room using the `!lt timezone` command.
 default_tz: "America/Los_Angeles"
+# How often to check whether any prompts need to be sent.
+# Generally you want this to be much lower than the smallest run_interval you plan to use.
+exec_frequency: "30m"

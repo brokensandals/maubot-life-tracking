@@ -6,19 +6,53 @@ from mautrix.types import EventType, MessageEvent
 from maubot_life_tracking import db
 from mautrix.util.async_db import UpgradeTable
 from zoneinfo import ZoneInfo
-from datetime import datetime, timezone
-from maubot_life_tracking.parsers import parse_datetime, parse_interval
+from datetime import datetime, timezone, timedelta
+from maubot_life_tracking.parsers import parse_datetime, parse_interval, render_template
+import asyncio
+import random
 
 
 class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
         helper.copy("allowlist")
         helper.copy("default_tz")
+        helper.copy("exec_frequency")
 
 
 class LifeTrackingBot(Plugin):
     async def start(self) -> None:
         self.config.load_and_update()
+        self.running = True
+        self.run_loop_task = self.run_loop()
+        asyncio.create_task(self.run_loop_task)
+    
+    async def stop(self) -> None:
+        self.running = False
+        self.run_loop_task = None
+
+    async def run_loop(self) -> None:
+        while self.running:
+            now = datetime.now(timezone.utc)
+            prompts = await db.fetch_prompts(self.database, due=now)
+            for prompt in prompts:
+                now = datetime.now(timezone.utc)
+                room = await self.get_room(prompt.room_id)
+                tz = self.get_tz(room)
+                localnow = now.astimezone(tz)
+                message = render_template(prompt.message_template, localnow)
+                evt_id = await self.client.send_text(room.room_id, message)
+                outreach = db.Outreach(room.room_id, evt_id, prompt.name, now, message)
+                await db.insert_outreach(self.database, outreach)
+                if prompt.run_interval is None:
+                    prompt.next_run = None
+                else:
+                    delay = 0
+                    if prompt.max_random_delay is not None:
+                        delay = random.randint(0, int(prompt.max_random_delay.total_seconds()))
+                    prompt.next_run += prompt.run_interval + timedelta(seconds=delay)
+                await db.upsert_prompt(self.database, prompt)
+
+            await asyncio.sleep(parse_interval(self.config["exec_frequency"]).total_seconds())
     
     def is_allowed(self, sender: str) -> bool:
         if self.config["allowlist"] == False:

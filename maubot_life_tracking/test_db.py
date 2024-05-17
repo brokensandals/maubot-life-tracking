@@ -65,6 +65,11 @@ class TestDb(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(prompts[0].run_interval, timedelta(days=1))
             self.assertEqual(prompts[0].max_random_delay, timedelta(hours=16))
 
+            prompts = await fetch_prompts(db, due=now - timedelta(seconds=10))
+            self.assertEqual(len(prompts), 1)
+            prompts = await fetch_prompts(db, due=now + timedelta(seconds=10))
+            self.assertEqual(len(prompts), 0)
+
             outreach = Outreach("a", "o1", "foo", now, "What's up?")
             await insert_outreach(db, outreach)
 
