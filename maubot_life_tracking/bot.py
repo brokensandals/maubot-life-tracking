@@ -156,6 +156,16 @@ class LifeTrackingBot(Plugin):
         await evt.mark_read()
         await evt.react("✅")
     
+    @lt_command.subcommand(help="Delete the specified prompt (if it exists).")
+    @command.argument("prompt_name")
+    async def rmprompt(self, evt: MessageEvent, prompt_name: str) -> None:
+        if not self.is_allowed(evt.sender):
+            self.log.warn(f"stranger danger: sender={evt.sender}")
+            return
+        await db.delete_prompt(self.database, evt.room_id, prompt_name)
+        await evt.mark_read()
+        await evt.react("✅")
+    
     @lt_command.subcommand(help="Set the next run date and time, run interval, and random delay for a prompt.")
     @command.argument("prompt_name")
     @command.argument("date", required=False)
