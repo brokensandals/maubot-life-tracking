@@ -37,14 +37,12 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(result.minute, 0)
         self.assertEqual(result.tzinfo, ZONE)
     
-
     def test_parse_interval(self) -> None:
         self.assertEqual(parse_interval("15d"), timedelta(days=15))
         self.assertEqual(parse_interval("15h"), timedelta(hours=15))
         self.assertEqual(parse_interval("15m"), timedelta(minutes=15))
         self.assertEqual(parse_interval("15s"), timedelta(seconds=15))
     
-
     def test_render_template(self) -> None:
         now = datetime(2024, 5, 17)
         self.assertEqual("it is Friday, May 17, 2024 - hi!", render_template("it is $(date) - hi!", now))

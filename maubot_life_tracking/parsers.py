@@ -1,5 +1,9 @@
 from datetime import datetime, tzinfo, timedelta
 import re
+from typing import List, Tuple
+from maubot_life_tracking import db
+import csv
+from io import StringIO
 
 
 DATETIME_RE = re.compile(r"(today|tom|tomorrow|\d\d\d\d-\d\d-\d\d)\s+\d\d\:\d\d")
@@ -38,3 +42,29 @@ def parse_interval(inp: str) -> timedelta:
 def render_template(template: str, now: datetime) -> str:
     date = now.strftime("%A, %B %-d, %Y")
     return template.replace("$(date)", date)
+
+
+def render_csv(ors: List[Tuple[db.Outreach, List[db.Response]]]) -> str:
+    out = StringIO()
+    fieldnames = ["room_id", "outreach_event_id", "prompt_name", "outreach_timestamp_utc", "outreach_message", "response_event_id", "response_timestamp_utc", "response_message"]
+    writer = csv.DictWriter(out, fieldnames=fieldnames)
+    writer.writeheader()
+    for outreach, responses in ors:
+        ofields = dict(
+            room_id=outreach.room_id,
+            outreach_event_id=outreach.event_id,
+            prompt_name=outreach.prompt_name,
+            outreach_timestamp_utc=outreach.timestamp.isoformat(),
+            outreach_message=outreach.message,
+        )
+        if not responses:
+            writer.writerow(ofields)
+        for response in responses:
+            row = dict(
+                response_event_id=response.event_id,
+                response_timestamp_utc=response.timestamp.isoformat(),
+                response_message=response.message,
+                **ofields
+            )
+            writer.writerow(row)
+    return out.getvalue()

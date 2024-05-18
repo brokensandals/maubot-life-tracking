@@ -7,7 +7,7 @@ from maubot_life_tracking import db
 from mautrix.util.async_db import UpgradeTable
 from zoneinfo import ZoneInfo
 from datetime import datetime, timezone, timedelta
-from maubot_life_tracking.parsers import parse_datetime, parse_interval, render_template
+from maubot_life_tracking.parsers import parse_datetime, parse_interval, render_template, render_csv
 import asyncio
 import random
 
@@ -165,6 +165,20 @@ class LifeTrackingBot(Plugin):
         await db.delete_prompt(self.database, evt.room_id, prompt_name)
         await evt.mark_read()
         await evt.react("✅")
+    
+    @lt_command.subcommand(help="Generate a CSV of outreaches and responses.")
+    async def csv(self, evt: MessageEvent) -> None:
+        if not self.is_allowed(evt.sender):
+            self.log.warn(f"stranger danger: sender={evt.sender}")
+            return
+        ors = await db.fetch_outreaches_and_responses(self.database, evt.room_id)
+        csvtext = render_csv(ors)
+        await evt.mark_read()
+        # TODO ability to send as a file instead
+        # TODO escape text
+        csvtext = csvtext.removesuffix("\n")
+        csvmd = f"```csv\n{csvtext}\n```"
+        await evt.reply(csvmd)
     
     @lt_command.subcommand(help="Set the next run date and time, run interval, and random delay for a prompt.")
     @command.argument("prompt_name")
