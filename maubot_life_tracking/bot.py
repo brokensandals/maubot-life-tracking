@@ -34,6 +34,7 @@ class LifeTrackingBot(Plugin):
         while self.running:
             now = datetime.now(timezone.utc)
             prompts = await db.fetch_prompts(self.database, due=now)
+            self.log.info(f"Found {len(prompts)} prompts ready for outreach")
             for prompt in prompts:
                 now = datetime.now(timezone.utc)
                 room = await self.get_room(prompt.room_id)
@@ -221,13 +222,28 @@ class LifeTrackingBot(Plugin):
             self.log.warn(f"stranger danger: sender={evt.sender}")
             return
         room = await self.get_room(evt.room_id)
-        if evt.relates_to:
-            outreach = await db.fetch_outreach(self.database, room.room_id, evt.relates_to.event_id)
+        if evt.content.relates_to and evt.content.relates_to.in_reply_to and evt.content.relates_to.in_reply_to.event_id:
+            outreach_event_id = evt.content.relates_to.in_reply_to.event_id
+            outreach = await db.fetch_outreach(self.database, room.room_id, outreach_event_id)
             if outreach:
-                ts = datetime.fromtimestamp(evt.origin_server_ts / 1000, timezone.utc)
+                ts = datetime.fromtimestamp(evt.timestamp / 1000, timezone.utc)
                 response = db.Response(room.room_id, evt.event_id, outreach.event_id, ts, evt.content.body)
                 await db.insert_response(self.database, response)
         await evt.mark_read()
+    
+    @event.on(EventType.REACTION)
+    async def handle_reaction(self, evt: MessageEvent) -> None:
+        if not self.is_allowed(evt.sender):
+            self.log.warn(f"stranger danger: sender={evt.sender}")
+            return
+        room = await self.get_room(evt.room_id)
+        if evt.content.relates_to and evt.content.relates_to.event_id:
+            outreach_event_id = evt.content.relates_to.event_id
+            outreach = await db.fetch_outreach(self.database, room.room_id, outreach_event_id)
+            if outreach:
+                ts = datetime.fromtimestamp(evt.timestamp / 1000, timezone.utc)
+                response = db.Response(room.room_id, evt.event_id, outreach.event_id, ts, evt.content.relates_to.key)
+                await db.insert_response(self.database, response)
 
     @classmethod
     def get_db_upgrade_table(cls) -> UpgradeTable | None:

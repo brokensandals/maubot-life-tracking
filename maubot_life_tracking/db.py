@@ -138,7 +138,7 @@ async def fetch_prompts(db: Database, room_id: Optional[str] = None, due: Option
     args = []
     if due is not None:
         args.append(due.strftime(DB_DATETIME_FMT))
-        q += f"next_run_utc IS NOT NULL AND DATETIME(next_run_utc) >= DATETIME(${argnum}) AND "
+        q += f"next_run_utc IS NOT NULL AND DATETIME(next_run_utc) <= DATETIME(${argnum}) AND "
         argnum += 1
     if room_id is not None:
         args.append(room_id)
